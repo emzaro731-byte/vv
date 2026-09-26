@@ -1,0 +1,14 @@
+{
+  "name": "vv-virtual-number",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Virtual phone number dashboard for calls, SMS and supported verification workflows.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

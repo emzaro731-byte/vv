@@ -9,12 +9,11 @@ const publicDir = path.join(__dirname, "public");
 const port = Number(process.env.PORT || 3000);
 
 const VB_BASE = (process.env.VOICEBIP_BASE_URL || "https://api.voicebip.com/v1").replace(/\/$/, "");
-const VB_KEY = process.env.VOICEBIP_API_KEY || "";
-const VB_AGENT_ID = process.env.VOICEBIP_AGENT_ID || "";
-const VB_WEBHOOK_SECRET = process.env.VOICEBIP_WEBHOOK_SECRET || "";
+const VB_KEY = (process.env.VOICEBIP_API_KEY || "").trim();
+const VB_AGENT_ID = (process.env.VOICEBIP_AGENT_ID || "").trim();
+const VB_WEBHOOK_SECRET = (process.env.VOICEBIP_WEBHOOK_SECRET || "").trim();
 const providerConfigured = Boolean(VB_KEY && VB_AGENT_ID);
 
-const numbers = [];
 const messages = [];
 
 function json(res, status, data) {
@@ -40,6 +39,12 @@ function serveFile(req, res) {
 }
 
 async function voicebip(pathname, options = {}) {
+  if (!providerConfigured) {
+    const error = new Error("Voicebip is not configured. Add VOICEBIP_API_KEY and VOICEBIP_AGENT_ID in Render.");
+    error.status = 503;
+    throw error;
+  }
+
   const response = await fetch(`${VB_BASE}${pathname}`, {
     ...options,
     headers: {
@@ -48,9 +53,11 @@ async function voicebip(pathname, options = {}) {
       ...(options.headers || {})
     }
   });
+
   const text = await response.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
   if (!response.ok) {
     const message = data?.message || data?.error || `Provider request failed (${response.status})`;
     const error = new Error(message);
@@ -64,10 +71,10 @@ function providerStatus() {
   return {
     configured: providerConfigured,
     provider: "Voicebip",
-    mode: providerConfigured ? "provider" : "demo",
+    mode: providerConfigured ? "provider" : "configuration_required",
     message: providerConfigured
-      ? "Voicebip credentials detected."
-      : "Demo mode. Add VOICEBIP_API_KEY and VOICEBIP_AGENT_ID on the server."
+      ? "Live Voicebip configuration detected."
+      : "Live mode is not configured. Add VOICEBIP_API_KEY and VOICEBIP_AGENT_ID to the Render service."
   };
 }
 
@@ -78,8 +85,7 @@ async function readBody(req) {
 }
 
 function verifyWebhook(rawBody, signature) {
-  if (!VB_WEBHOOK_SECRET) return false;
-  if (!signature) return false;
+  if (!VB_WEBHOOK_SECRET || !signature) return false;
   const expected = crypto.createHmac("sha256", VB_WEBHOOK_SECRET).update(rawBody).digest("hex");
   const supplied = String(signature).replace(/^sha256=/, "");
   try {
@@ -117,18 +123,26 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
 
   try {
-    if (req.method === "GET" && url.pathname === "/api/status") return json(res, 200, providerStatus());
+    if (req.method === "GET" && url.pathname === "/api/status") {
+      return json(res, 200, providerStatus());
+    }
 
     if (req.method === "GET" && url.pathname === "/api/numbers") {
-      if (!providerConfigured) return json(res, 200, { numbers: [{ id:"demo", number:"+234 800 000 0000", country:"Nigeria", capabilities:["SMS","Voice"], status:"demo" }] });
+      if (!providerConfigured) {
+        return json(res, 503, {
+          error: "Live Voicebip configuration is missing.",
+          required: ["VOICEBIP_API_KEY", "VOICEBIP_AGENT_ID"]
+        });
+      }
       const data = await voicebip("/numbers");
       return json(res, 200, { numbers: data.numbers || data.data || [] });
     }
 
-    if (req.method === "GET" && url.pathname === "/api/messages") return json(res, 200, { messages });
+    if (req.method === "GET" && url.pathname === "/api/messages") {
+      return json(res, 200, { messages });
+    }
 
     if (req.method === "POST" && url.pathname === "/api/numbers/request") {
-      if (!providerConfigured) return json(res, 400, { error: "Configure Voicebip first." });
       const body = await readBody(req);
       const input = JSON.parse(body.toString() || "{}");
       const data = await voicebip("/numbers/auto", {
@@ -136,7 +150,7 @@ const server = http.createServer(async (req, res) => {
         body: JSON.stringify({
           agent_id: VB_AGENT_ID,
           type: input.type || "mobile_virtual",
-          country_code: "NG",
+          country_code: input.country_code || "NG",
           channels: input.channels || ["voice", "sms"]
         })
       });
@@ -144,7 +158,6 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && url.pathname === "/api/messages/send") {
-      if (!providerConfigured) return json(res, 400, { error: "Configure Voicebip first." });
       const body = JSON.parse((await readBody(req)).toString() || "{}");
       const data = await voicebip("/messages", {
         method: "POST",

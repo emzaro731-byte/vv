@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: vv-virtual-number
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/status
+    envVars:
+      - key: VOICEBIP_BASE_URL
+        value: https://api.voicebip.com/v1
+      - key: VOICEBIP_API_KEY
+        sync: false
+      - key: VOICEBIP_AGENT_ID
+        sync: false
+      - key: VOICEBIP_WEBHOOK_SECRET
+        sync: false

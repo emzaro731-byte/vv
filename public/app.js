@@ -18,9 +18,9 @@ function renderNumbers(items) {
   $("numberCount").textContent = items.length;
   $("numbers").innerHTML = items.length ? items.map(n => `
     <div class="item">
-      <div class="item-top"><span class="number">${n.number}</span><span class="pill">${n.status}</span></div>
-      <div class="meta">${n.country} · ${n.capabilities.join(" · ")}</div>
-    </div>`).join("") : '<div class="empty">No numbers yet.</div>';
+      <div class="item-top"><span class="number">${escapeHtml(n.number)}</span><span class="pill">${escapeHtml(n.status || "active")}</span></div>
+      <div class="meta">${escapeHtml(n.country || "NG")} · ${(n.capabilities || []).map(escapeHtml).join(" · ")}</div>
+    </div>`).join("") : '<div class="empty">No live numbers available.</div>';
 }
 
 function renderMessages(items) {
@@ -34,17 +34,24 @@ function renderMessages(items) {
 }
 
 function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(value ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 async function loadAll() {
   try {
-    const [status, numberData, messageData] = await Promise.all([
-      api("/api/status"), api("/api/numbers"), api("/api/messages")
-    ]);
-    $("modeBadge").textContent = status.mode === "provider" ? "Provider configured" : "Demo mode";
-    renderNumbers(numberData.numbers);
-    renderMessages(messageData.messages);
+    const status = await api("/api/status");
+    $("modeBadge").textContent = status.configured ? "Live provider" : "Configuration required";
+
+    try {
+      const numberData = await api("/api/numbers");
+      renderNumbers(numberData.numbers || []);
+    } catch (error) {
+      renderNumbers([]);
+      toast(error.message);
+    }
+
+    const messageData = await api("/api/messages");
+    renderMessages(messageData.messages || []);
   } catch (error) {
     toast(error.message);
   }
@@ -52,7 +59,13 @@ async function loadAll() {
 
 $("requestBtn").addEventListener("click", async () => {
   try {
-    await api("/api/numbers/request", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({country:"NG", capabilities:["sms","voice"]}) });
+    await api("/api/numbers/request", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({country_code:"NG", channels:["voice","sms"]})
+    });
+    toast("Live number request submitted.");
+    loadAll();
   } catch (error) {
     toast(error.message);
   }

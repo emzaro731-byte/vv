@@ -27,7 +27,7 @@ function json(res, status, data) {
 
 function serveFile(req, res) {
   const requested = req.url === "/" ? "/index.html" : new URL(req.url, `http://localhost:${port}`).pathname;
-  const safe = path.normalize(requested).replace(/^([.][.][/\\\\])+/, "");
+  const safe = path.normalize(requested).replace(/^([.][.][/\\])+/, "");
   const file = path.join(publicDir, safe);
   if (!file.startsWith(publicDir)) return json(res, 403, { error: "Forbidden" });
   fs.readFile(file, (err, data) => {
@@ -155,7 +155,23 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, providerStatus());
     }
 
-    if (req.method === "POST" && url.pathname === "/api/voice-token") {\n      const body = JSON.parse((await readBody(req)).toString() || "{}");\n      const requestedAgent = String(body.agent_id || VB_AGENT_ID).trim();\n      if (!requestedAgent || requestedAgent !== VB_AGENT_ID) return json(res, 400, { error: "Invalid agent_id." });\n      const data = await voicebip("/webrtc/token", { method: "POST", body: JSON.stringify({ agent_id: VB_AGENT_ID }) });\n      return json(res, 200, data);\n    }\n\n    if (req.method === "GET" && url.pathname === "/api/numbers") {
+    if (req.method === "POST" && url.pathname === "/api/voice-token") {
+      const body = JSON.parse((await readBody(req)).toString() || "{}");
+      const requestedAgent = String(body.agent_id || VB_AGENT_ID).trim();
+
+      if (!requestedAgent || requestedAgent !== VB_AGENT_ID) {
+        return json(res, 400, { error: "Invalid agent_id." });
+      }
+
+      const data = await voicebip("/webrtc/token", {
+        method: "POST",
+        body: JSON.stringify({ agent_id: VB_AGENT_ID })
+      });
+
+      return json(res, 200, data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/numbers") {
       if (!providerConfigured) {
         return json(res, 503, {
           error: "Live Voicebip configuration is missing.",
@@ -208,7 +224,6 @@ const server = http.createServer(async (req, res) => {
       return handleWebhook(req, res);
     }
 
-    // Voicebip's documented webhook URL is /voicebip/webhook.
     if (req.method === "POST" && url.pathname === "/voicebip/webhook") {
       return handleWebhook(req, res);
     }

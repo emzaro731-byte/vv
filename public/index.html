@@ -12,18 +12,20 @@
 <section class="stats">
 <div class="card stat"><span>Active numbers</span><strong id="numberCount">—</strong></div>
 <div class="card stat"><span>Messages</span><strong id="messageCount">—</strong></div>
-<div class="card stat"><span>Voice</span><strong id="voiceStatus">Ready</strong><small>Phone dialer available</small></div>
+<div class="card stat"><span>Voice</span><strong id="voiceStatus">Ready</strong><small id="voiceStatusDetail">Browser WebRTC available</small></div>
 </section>
 <section class="grid main-grid">
-<div class="card"><div class="section-head"><h2>Phone dialer</h2><span class="muted">Voicebip</span></div>
+<div class="card"><div class="section-head"><h2>Phone dialer</h2><span class="muted">Voicebip WebRTC</span></div>
 <div class="dialer"><input id="dialNumber" class="dial-input" inputmode="tel" autocomplete="tel" placeholder="+234..." aria-label="Phone number">
-<div class="dial-actions"><button id="callBtn" class="call-btn">☎ Call</button><button id="clearDial" class="ghost">Clear</button></div>
+<div class="dial-actions"><button id="callBtn" class="call-btn">☎ Start call</button><button id="clearDial" class="ghost">Clear</button></div>
+<div class="dial-actions"><button id="muteBtn" class="ghost" disabled>🎙 Mute</button><button id="hangupBtn" class="ghost" disabled>✕ Hang up</button></div>
 <div class="keypad">
 <button class="key" data-key="1">1</button><button class="key" data-key="2">2</button><button class="key" data-key="3">3</button>
 <button class="key" data-key="4">4</button><button class="key" data-key="5">5</button><button class="key" data-key="6">6</button>
 <button class="key" data-key="7">7</button><button class="key" data-key="8">8</button><button class="key" data-key="9">9</button>
 <button class="key" data-key="*">*</button><button class="key" data-key="0">0</button><button class="key" data-key="#">#</button>
-</div><p class="muted dial-hint">On a phone, Call opens your device dialer. Browser calling can be added with Voicebip WebRTC.</p></div></div>
+</div><p id="dialHint" class="muted dial-hint">Browser calls use your microphone and Voicebip WebRTC. Keep this page open during the call.</p>
+<div id="transcript" class="transcript" aria-live="polite"></div></div></div>
 <div class="card"><div class="section-head"><h2>Message box</h2><span class="muted">SMS</span></div>
 <form id="messageForm" class="message-box"><label>From number<select id="fromNumber"></select></label><label>To number<input id="toNumber" inputmode="tel" autocomplete="tel" placeholder="+234..." required></label><label>Message<textarea id="messageBody" maxlength="1600" placeholder="Type your message..." required></textarea></label>
 <div class="message-footer"><span id="charCount" class="muted">0 / 1600</span><button class="primary" type="submit">Send SMS</button></div></form></div>

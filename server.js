@@ -15,6 +15,7 @@ const VB_WEBHOOK_SECRET = (process.env.VOICEBIP_WEBHOOK_SECRET || "").trim();
 const providerConfigured = Boolean(VB_KEY && VB_AGENT_ID);
 
 const messages = [];
+const callEvents = [];
 
 function json(res, status, data) {
   res.writeHead(status, {
@@ -25,8 +26,8 @@ function json(res, status, data) {
 }
 
 function serveFile(req, res) {
-  const requested = req.url === "/" ? "/index.html" : req.url;
-  const safe = path.normalize(requested).replace(/^([.][.][/\\])+/, "");
+  const requested = req.url === "/" ? "/index.html" : new URL(req.url, `http://localhost:${port}`).pathname;
+  const safe = path.normalize(requested).replace(/^([.][.][/\\\\])+/, "");
   const file = path.join(publicDir, safe);
   if (!file.startsWith(publicDir)) return json(res, 403, { error: "Forbidden" });
   fs.readFile(file, (err, data) => {
@@ -71,6 +72,8 @@ function providerStatus() {
   return {
     configured: providerConfigured,
     provider: "Voicebip",
+    agent_id: VB_AGENT_ID || null,
+    webhook_configured: Boolean(VB_WEBHOOK_SECRET),
     mode: providerConfigured ? "provider" : "configuration_required",
     message: providerConfigured
       ? "Live Voicebip configuration detected."
@@ -86,32 +89,57 @@ async function readBody(req) {
 
 function verifyWebhook(rawBody, signature) {
   if (!VB_WEBHOOK_SECRET || !signature) return false;
-  const expected = crypto.createHmac("sha256", VB_WEBHOOK_SECRET).update(rawBody).digest("hex");
-  const supplied = String(signature).replace(/^sha256=/, "");
-  try {
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(supplied));
-  } catch {
-    return false;
-  }
+
+  const supplied = String(signature).trim().replace(/^sha256=/i, "");
+  const expectedHex = crypto.createHmac("sha256", VB_WEBHOOK_SECRET).update(rawBody).digest("hex");
+  const expectedBase64 = crypto.createHmac("sha256", VB_WEBHOOK_SECRET).update(rawBody).digest("base64");
+
+  const matches = (a, b) => {
+    const aa = Buffer.from(a);
+    const bb = Buffer.from(b);
+    return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
+  };
+
+  return matches(expectedHex, supplied) || matches(expectedBase64, supplied);
 }
 
 async function handleWebhook(req, res) {
   const raw = await readBody(req);
   const signature = req.headers["x-voicebip-signature"];
-  if (!verifyWebhook(raw, signature)) return json(res, 401, { error: "Invalid webhook signature" });
+
+  if (!verifyWebhook(raw, signature)) {
+    return json(res, 401, { error: "Invalid webhook signature" });
+  }
 
   let event;
-  try { event = JSON.parse(raw.toString("utf8")); } catch {
+  try {
+    event = JSON.parse(raw.toString("utf8"));
+  } catch {
     return json(res, 400, { error: "Invalid JSON" });
   }
 
-  if (event.event_type === "message.received") {
+  const eventType = event.event_type || event.type || "unknown";
+  const eventId = event.event_id || crypto.randomUUID();
+
+  callEvents.unshift({
+    id: eventId,
+    event_type: eventType,
+    agent_id: event.agent_id || null,
+    call_id: event.call_id || event.payload?.call_id || null,
+    from: event.from || event.from_number || event.payload?.from_number || null,
+    to: event.to || event.to_number || event.payload?.to_number || event.number || null,
+    timestamp: event.timestamp || new Date().toISOString(),
+    payload: event.payload || {}
+  });
+
+  if (eventType === "message.received") {
     const p = event.payload || {};
+    const body = p.body || p.inbound_message?.body || "";
     messages.unshift({
-      id: p.message_id || event.event_id,
+      id: p.message_id || eventId,
       number: event.number,
       from: event.from,
-      body: p.body || "",
+      body,
       receivedAt: event.timestamp || new Date().toISOString()
     });
   }
@@ -142,6 +170,10 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { messages });
     }
 
+    if (req.method === "GET" && url.pathname === "/api/calls/events") {
+      return json(res, 200, { events: callEvents.slice(0, 100) });
+    }
+
     if (req.method === "POST" && url.pathname === "/api/numbers/request") {
       const body = await readBody(req);
       const input = JSON.parse(body.toString() || "{}");
@@ -149,9 +181,9 @@ const server = http.createServer(async (req, res) => {
         method: "POST",
         body: JSON.stringify({
           agent_id: VB_AGENT_ID,
-          type: input.type || "mobile_virtual",
+          type: input.type || "geo_did",
           country_code: input.country_code || "NG",
-          channels: input.channels || ["voice", "sms"]
+          channels: input.channels || ["voice"]
         })
       });
       return json(res, 200, data);
@@ -163,7 +195,7 @@ const server = http.createServer(async (req, res) => {
         method: "POST",
         body: JSON.stringify({
           agent_id: VB_AGENT_ID,
-          channel: "sms",
+          channel: body.channel || "sms",
           from_number: body.from_number,
           to_number: body.to_number,
           body: body.body
@@ -172,14 +204,12 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, data);
     }
 
-    if (req.method === "POST" && url.pathname === "/api/calls") {
-      return json(res, 501, {
-        error: "Voice call creation depends on the provider's approved call endpoint and account capabilities.",
-        provider: "Voicebip"
-      });
+    if (req.method === "POST" && url.pathname === "/api/webhooks/voicebip") {
+      return handleWebhook(req, res);
     }
 
-    if (req.method === "POST" && url.pathname === "/api/webhooks/voicebip") {
+    // Voicebip's documented webhook URL is /voicebip/webhook.
+    if (req.method === "POST" && url.pathname === "/voicebip/webhook") {
       return handleWebhook(req, res);
     }
 
@@ -190,4 +220,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => console.log(`VV Virtual Numbers running on http://localhost:${port}`));
+server.listen(port, "0.0.0.0", () => {
+  console.log(`VV Virtual Numbers running on port ${port}`);
+});

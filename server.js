@@ -212,8 +212,9 @@ const server = http.createServer(async (req, res) => {
       const countryCode = String(input.country_code || "NG").trim().toUpperCase();
       const requestedType = String(input.type || "geo_did").trim();
 
-      // Try the requested type first. If NG geo_did inventory is empty,
-      // automatically try mobile_virtual before returning an availability error.
+      // Voicebip's /numbers/auto provisions the first matching number.
+      // Normalize all inventory-related responses so the UI gets a clear,
+      // retryable status instead of a generic failure.
       const types = requestedType === "geo_did"
         ? ["geo_did", "mobile_virtual"]
         : [requestedType];
@@ -230,20 +231,30 @@ const server = http.createServer(async (req, res) => {
               channels: ["voice"]
             })
           });
-          return json(res, 200, { ...data, provisioned_type: type });
+          return json(res, 200, { success: true, ...data, provisioned_type: type });
         } catch (error) {
           lastError = error;
-          // 404 means this number type is not currently in provider inventory.
-          // Continue to the next supported type.
-          if (error.status !== 404) throw error;
+          const message = String(error?.message || "").toLowerCase();
+          const inventoryError =
+            error.status === 404 || error.status === 409 || error.status === 422 ||
+            message.includes("no numbers available") ||
+            message.includes("no number available") ||
+            message.includes("inventory") ||
+            message.includes("unavailable") ||
+            message.includes("no matching");
+          if (!inventoryError) throw error;
         }
       }
 
-      return json(res, 404, {
+      return json(res, 503, {
+        success: false,
+        status: "inventory_unavailable",
         error: "No Voicebip number is currently available for this country.",
         country_code: countryCode,
         attempted_types: types,
-        details: lastError?.message || "Provider inventory is empty."
+        agent_id: VB_AGENT_ID,
+        details: lastError?.message || "Voicebip number inventory is currently empty.",
+        retryable: true
       });
     }
 

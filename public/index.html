@@ -1,61 +1,36 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VV — Virtual Numbers</title>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#070b14"><title>VV — Virtual Numbers</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><span class="brand-mark">VV</span><span>Virtual Numbers</span></div>
-    <span id="modeBadge" class="badge">Checking…</span>
-  </header>
-
-  <main class="shell">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">CALLS • SMS • VERIFICATION</p>
-        <h1>Your virtual number workspace.</h1>
-        <p class="sub">Manage numbers, read messages, and prepare calling and verification workflows from one dashboard.</p>
-      </div>
-      <button id="requestBtn" class="primary">+ Get a number</button>
-    </section>
-
-    <section class="stats">
-      <div class="card stat"><span>Active numbers</span><strong id="numberCount">—</strong></div>
-      <div class="card stat"><span>Unread SMS</span><strong id="messageCount">—</strong></div>
-      <div class="card stat"><span>Voice</span><strong>Ready</strong><small>Provider connection required</small></div>
-    </section>
-
-    <section class="grid">
-      <div class="card">
-        <div class="section-head"><h2>My numbers</h2><button class="ghost" onclick="loadAll()">Refresh</button></div>
-        <div id="numbers" class="list"></div>
-      </div>
-
-      <div class="card">
-        <div class="section-head"><h2>SMS inbox</h2><span class="muted">Latest</span></div>
-        <div id="messages" class="list"></div>
-      </div>
-    </section>
-
-    <section class="card setup">
-      <div>
-        <p class="eyebrow">GO LIVE</p>
-        <h2>Connect a real number provider</h2>
-        <p>VV is provider-ready, but real +234 number provisioning, SMS and calls require an approved telecom/VoIP provider account and server-side credentials.</p>
-      </div>
-      <div class="checklist">
-        <span>✓ Keep API keys server-side</span>
-        <span>✓ Verify webhook signatures</span>
-        <span>✓ Store only necessary message data</span>
-        <span>✓ Respect provider and verification policies</span>
-      </div>
-    </section>
-  </main>
-
-  <div id="toast" class="toast"></div>
-  <script src="/app.js"></script>
-</body>
-</html>
+<header class="topbar"><div class="brand"><span class="brand-mark">VV</span><span>Virtual Numbers</span></div><span id="modeBadge" class="badge">Checking…</span></header>
+<main class="shell">
+<section class="hero"><div><p class="eyebrow">CALLS • SMS • VERIFICATION</p><h1>Your virtual number workspace.</h1><p class="sub">Call, text and manage your Voicebip numbers from one dashboard.</p></div><button id="requestBtn" class="primary">+ Get a number</button></section>
+<section class="stats">
+<div class="card stat"><span>Active numbers</span><strong id="numberCount">—</strong></div>
+<div class="card stat"><span>Messages</span><strong id="messageCount">—</strong></div>
+<div class="card stat"><span>Voice</span><strong id="voiceStatus">Ready</strong><small>Phone dialer available</small></div>
+</section>
+<section class="grid main-grid">
+<div class="card"><div class="section-head"><h2>Phone dialer</h2><span class="muted">Voicebip</span></div>
+<div class="dialer"><input id="dialNumber" class="dial-input" inputmode="tel" autocomplete="tel" placeholder="+234..." aria-label="Phone number">
+<div class="dial-actions"><button id="callBtn" class="call-btn">☎ Call</button><button id="clearDial" class="ghost">Clear</button></div>
+<div class="keypad">
+<button class="key" data-key="1">1</button><button class="key" data-key="2">2</button><button class="key" data-key="3">3</button>
+<button class="key" data-key="4">4</button><button class="key" data-key="5">5</button><button class="key" data-key="6">6</button>
+<button class="key" data-key="7">7</button><button class="key" data-key="8">8</button><button class="key" data-key="9">9</button>
+<button class="key" data-key="*">*</button><button class="key" data-key="0">0</button><button class="key" data-key="#">#</button>
+</div><p class="muted dial-hint">On a phone, Call opens your device dialer. Browser calling can be added with Voicebip WebRTC.</p></div></div>
+<div class="card"><div class="section-head"><h2>Message box</h2><span class="muted">SMS</span></div>
+<form id="messageForm" class="message-box"><label>From number<select id="fromNumber"></select></label><label>To number<input id="toNumber" inputmode="tel" autocomplete="tel" placeholder="+234..." required></label><label>Message<textarea id="messageBody" maxlength="1600" placeholder="Type your message..." required></textarea></label>
+<div class="message-footer"><span id="charCount" class="muted">0 / 1600</span><button class="primary" type="submit">Send SMS</button></div></form></div>
+</section>
+<section class="grid">
+<div class="card"><div class="section-head"><h2>My numbers</h2><button class="ghost" onclick="loadAll()">Refresh</button></div><div id="numbers" class="list"></div></div>
+<div class="card"><div class="section-head"><h2>SMS inbox</h2><span class="muted">Latest</span></div><div id="messages" class="list"></div></div>
+</section>
+</main><div id="toast" class="toast"></div><script src="/app.js"></script>
+</body></html>

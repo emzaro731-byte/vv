@@ -336,7 +336,13 @@ $("requestBtn").addEventListener("click", async () => {
     toast(result.e164 ? `Number provisioned: ${result.e164}` : "Live number request submitted.");
     loadAll();
   } catch (error) {
-    toast(error.message);
+    const message = error?.message || "Unable to provision a number.";
+    if (message.toLowerCase().includes("no voicebip number") || message.toLowerCase().includes("inventory")) {
+      toast("No Nigerian Voicebip number is currently in inventory. Your agent is configured; try again when inventory returns.");
+    } else {
+      toast(message);
+    }
+    console.error("Voicebip number request:", error);
   }
 });
 

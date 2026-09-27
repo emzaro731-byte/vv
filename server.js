@@ -21,6 +21,54 @@ const callEvents = [];
 async function retryNigeriaNumber() {
   if (!providerConfigured) return;
   try {
+    const current = await voicebip("/numbers");
+    const nums = current?.numbers || current?.data || [];
+    if (nums.some(n => String(n.agent_id || n.agent?.agent_id || "") === VB_AGENT_ID && String(n.status || "").toLowerCase() !== "released")) return;
+
+    for (const type of ["geo_did", "mobile_virtual"]) {
+      try {
+        const data = await voicebip("/numbers/auto", {
+          method: "POST",
+          body: JSON.stringify({
+            agent_id: VB_AGENT_ID,
+            type,
+            country_code: "NG",
+            channels: ["voice"]
+          })
+        });
+        console.log("Voicebip Nigeria number provisioned:", data?.e164 || data?.number_id || type);
+        return;
+      } catch (e) {
+        console.log("Voicebip " + type + " unavailable; trying next type:", e.message);
+      }
+    }
+    console.log("No Nigerian Voicebip number available yet; will retry.");
+  } catch (e) {
+    console.log("Voicebip Nigeria inventory check failed; will retry:", e.message);
+  }
+}port http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const publicDir = path.join(__dirname, "public");
+const port = Number(process.env.PORT || 3000);
+
+const VB_BASE = (process.env.VOICEBIP_BASE_URL || "https://api.voicebip.com/v1").replace(/\/$/, "");
+const VB_KEY = (process.env.VOICEBIP_API_KEY || "").trim();
+const VB_AGENT_ID = (process.env.VOICEBIP_AGENT_ID || "").trim();
+const VB_WEBHOOK_SECRET = (process.env.VOICEBIP_WEBHOOK_SECRET || "").trim();
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").trim().replace(/\/$/, "");
+const providerConfigured = Boolean(VB_KEY && VB_AGENT_ID);
+
+const messages = [];
+const callEvents = [];
+// Automatic NG number retry: checks Voicebip inventory every 5 minutes.
+async function retryNigeriaNumber() {
+  if (!providerConfigured) return;
+  try {
     const current=await voicebip("/numbers");
     const nums=current?.numbers||current?.data||[];
     if(nums.some(n=>String(n.agent_id||n.agent?.agent_id||"")===VB_AGENT_ID && String(n.status||"").toLowerCase()!=="released")) return;

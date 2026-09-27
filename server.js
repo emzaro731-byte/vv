@@ -155,7 +155,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, providerStatus());
     }
 
-    if (req.method === "GET" && url.pathname === "/api/numbers") {
+    if (req.method === "POST" && url.pathname === "/api/voice-token") {\n      const body = JSON.parse((await readBody(req)).toString() || "{}");\n      const requestedAgent = String(body.agent_id || VB_AGENT_ID).trim();\n      if (!requestedAgent || requestedAgent !== VB_AGENT_ID) return json(res, 400, { error: "Invalid agent_id." });\n      const data = await voicebip("/webrtc/token", { method: "POST", body: JSON.stringify({ agent_id: VB_AGENT_ID }) });\n      return json(res, 200, data);\n    }\n\n    if (req.method === "GET" && url.pathname === "/api/numbers") {
       if (!providerConfigured) {
         return json(res, 503, {
           error: "Live Voicebip configuration is missing.",

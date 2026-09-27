@@ -331,7 +331,7 @@ $("requestBtn").addEventListener("click", async () => {
     const result = await api("/api/numbers/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ country_code: "NG", channels: ["voice", "sms"] })
+      body: JSON.stringify({ country_code: $("countryCode").value, channels: ["voice"] })
     });
     toast(result.e164 ? `Number provisioned: ${result.e164}` : "Live number request submitted.");
     loadAll();

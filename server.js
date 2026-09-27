@@ -12,6 +12,7 @@ const VB_BASE = (process.env.VOICEBIP_BASE_URL || "https://api.voicebip.com/v1")
 const VB_KEY = (process.env.VOICEBIP_API_KEY || "").trim();
 const VB_AGENT_ID = (process.env.VOICEBIP_AGENT_ID || "").trim();
 const VB_WEBHOOK_SECRET = (process.env.VOICEBIP_WEBHOOK_SECRET || "").trim();
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").trim().replace(/\/$/, "");
 const providerConfigured = Boolean(VB_KEY && VB_AGENT_ID);
 
 const messages = [];
@@ -74,6 +75,11 @@ function providerStatus() {
     provider: "Voicebip",
     agent_id: VB_AGENT_ID || null,
     webhook_configured: Boolean(VB_WEBHOOK_SECRET),
+    webhook_url: PUBLIC_BASE_URL ? PUBLIC_BASE_URL + "/voicebip/webhook" : null,
+    missing: [
+      ...(!VB_KEY ? ["VOICEBIP_API_KEY"] : []),
+      ...(!VB_AGENT_ID ? ["VOICEBIP_AGENT_ID"] : [])
+    ],
     mode: providerConfigured ? "provider" : "configuration_required",
     message: providerConfigured
       ? "Live Voicebip configuration detected."
@@ -171,6 +177,16 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, data);
     }
 
+    if (req.method === "POST" && url.pathname === "/api/agent/configure") {
+      const webhookUrl = PUBLIC_BASE_URL ? PUBLIC_BASE_URL + "/voicebip/webhook" : "";
+      if (!webhookUrl) return json(res, 400, { error: "Set PUBLIC_BASE_URL in Render first." });
+      const data = await voicebip("/agents/" + encodeURIComponent(VB_AGENT_ID), {
+        method: "PATCH",
+        body: JSON.stringify({ webhook_url: webhookUrl })
+      });
+      return json(res, 200, data);
+    }
+
     if (req.method === "GET" && url.pathname === "/api/numbers") {
       if (!providerConfigured) {
         return json(res, 503, {
@@ -199,7 +215,7 @@ const server = http.createServer(async (req, res) => {
           agent_id: VB_AGENT_ID,
           type: input.type || "geo_did",
           country_code: input.country_code || "NG",
-          channels: input.channels || ["voice"]
+          channels: ["voice"]
         })
       });
       return json(res, 200, data);

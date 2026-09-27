@@ -17,6 +17,20 @@ const providerConfigured = Boolean(VB_KEY && VB_AGENT_ID);
 
 const messages = [];
 const callEvents = [];
+// Automatic NG number retry: checks Voicebip inventory every 5 minutes.
+async function retryNigeriaNumber() {
+  if (!providerConfigured) return;
+  try {
+    const current=await voicebip("/numbers");
+    const nums=current?.numbers||current?.data||[];
+    if(nums.some(n=>String(n.agent_id||n.agent?.agent_id||"")===VB_AGENT_ID && String(n.status||"").toLowerCase()!=="released")) return;
+    await voicebip("/numbers/auto",{method:"POST",body:JSON.stringify({agent_id:VB_AGENT_ID,type:"geo_did",country_code:"NG",channels:["voice"]})});
+    console.log("Voicebip Nigeria number provisioned.");
+  } catch(e) {
+    console.log("Voicebip Nigeria inventory unavailable; will retry:",e.message);
+  }
+}
+
 
 function json(res, status, data) {
   res.writeHead(status, {
@@ -287,6 +301,9 @@ const server = http.createServer(async (req, res) => {
     return json(res, error.status || 500, { error: error.message || "Server error" });
   }
 });
+
+setTimeout(retryNigeriaNumber, 3000);
+setInterval(retryNigeriaNumber, 300000);
 
 server.listen(port, "0.0.0.0", () => {
   console.log(`VV Virtual Numbers running on port ${port}`);

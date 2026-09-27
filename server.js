@@ -209,16 +209,42 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/numbers/request") {
       const body = await readBody(req);
       const input = JSON.parse(body.toString() || "{}");
-      const data = await voicebip("/numbers/auto", {
-        method: "POST",
-        body: JSON.stringify({
-          agent_id: VB_AGENT_ID,
-          type: input.type || "geo_did",
-          country_code: input.country_code || "NG",
-          channels: ["voice"]
-        })
+      const countryCode = String(input.country_code || "NG").trim().toUpperCase();
+      const requestedType = String(input.type || "geo_did").trim();
+
+      // Try the requested type first. If NG geo_did inventory is empty,
+      // automatically try mobile_virtual before returning an availability error.
+      const types = requestedType === "geo_did"
+        ? ["geo_did", "mobile_virtual"]
+        : [requestedType];
+
+      let lastError;
+      for (const type of types) {
+        try {
+          const data = await voicebip("/numbers/auto", {
+            method: "POST",
+            body: JSON.stringify({
+              agent_id: VB_AGENT_ID,
+              type,
+              country_code: countryCode,
+              channels: ["voice"]
+            })
+          });
+          return json(res, 200, { ...data, provisioned_type: type });
+        } catch (error) {
+          lastError = error;
+          // 404 means this number type is not currently in provider inventory.
+          // Continue to the next supported type.
+          if (error.status !== 404) throw error;
+        }
+      }
+
+      return json(res, 404, {
+        error: "No Voicebip number is currently available for this country.",
+        country_code: countryCode,
+        attempted_types: types,
+        details: lastError?.message || "Provider inventory is empty."
       });
-      return json(res, 200, data);
     }
 
     if (req.method === "POST" && url.pathname === "/api/messages/send") {
